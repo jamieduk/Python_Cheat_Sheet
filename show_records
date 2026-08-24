@@ -1,0 +1,31 @@
+#!/bin/bash
+# J~Net Python Cheat Sheet — show / search records (c)J~Net 2022
+#
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RECORDS="$SCRIPT_DIR/records"
+[ ! -d "$RECORDS" ] && mkdir -p "$RECORDS"
+
+NOW=$(date '+%F_%H:%M:%S')
+echo "J~Net Python Cheat Sheet (c)J~Net 2022 — The time & date is $NOW"
+echo ""
+numfiles=$(find "$RECORDS" -name '*.txt' 2>/dev/null | wc -l)
+echo "Total Records $numfiles"
+echo ""
+
+if command -v fzf >/dev/null 2>&1 && [[ "$numfiles" -gt 0 ]]; then
+    title=$(cd "$SCRIPT_DIR" && \
+        ls "$RECORDS"/*.txt | xargs -n1 basename | sed 's/\.txt$//' | sort | \
+        fzf --layout=reverse --height=60% --border=rounded --info=inline \
+            --prompt="Pick a record to view > ")
+    if [[ -n "$title" ]]; then
+        LESS="-R -X -F -M +G" LESSHISTFILE=/dev/null less "$RECORDS/$title.txt"
+    fi
+else
+    echo "Enter a term, or nothing to go back to the menu"
+    read -r input
+    if [[ -n "$input" ]]; then
+        rg -n --color=always "$input" "$RECORDS"/ 2>/dev/null | less -R
+    fi
+fi
+
+bash "$SCRIPT_DIR/menu"

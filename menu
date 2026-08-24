@@ -1,0 +1,390 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+#  J~Net Python Cheat Sheet  -  Interactive Menu  (c)J~Net 2022  (enhanced)
+#
+#  Live fuzzy-matching search across records, colourful scolling viewer with
+#  in-record live search (matches colourised + underlined) and a useful action
+#  menu once a record is selected.
+#  Requires: fzf  (bat / pygments optional, used for colourful previews)
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+# colours / styling
+#------------------------------------------------------------------------------
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_DIM="\033[2m"
+C_UNDERLINE="\033[4m"
+C_RED="\033[31m"
+C_GREEN="\033[32m"
+C_YELLOW="\033[93m"
+C_BLUE="\033[34m"
+C_CYAN="\033[36m"
+C_MAGENTA="\033[35m"
+C_WHITE="\033[97m"
+
+# hl carries the :underline attribute so live matches are underlined AND pink
+FZF_COLOR=(
+  --color=fg:#bbbbbb,bg:-1,hl:#ff87af:underline,fg+:#ffffff,bg+:#2b2b2b,hl+:#ff87af:underline
+  --color=info:#87af5f,prompt:#5f87ff,pointer:#ff5f87,marker:#87afff
+  --color=spinner:#ff5f87,header:#87af5f,query:#ffd75f,border:#585858
+  --color=scrollbar:#5f87ff,separator:#585858,label:#ffafff
+)
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RECORDS="$SCRIPT_DIR/records"
+selected=""
+
+#------------------------------------------------------------------------------
+# helpers
+#------------------------------------------------------------------------------
+banner() {
+  clear
+  echo -e "${C_MAGENTA}${C_BOLD}  J~Net Python Cheat Sheet${C_RESET} ${C_DIM}(c)J~Net 2022${C_RESET}  |  ${C_YELLOW}$(date '+%F %H:%M:%S')${C_RESET}"
+  echo -e "${C_DIM}  ───────────────────────────────────────────────────────────${C_RESET}"
+}
+
+require_records() {
+  if ! ls "$RECORDS"/*.txt >/dev/null 2>&1; then
+    if [[ -f "$SCRIPT_DIR/records.zip" ]]; then
+      echo -e "${C_YELLOW}No records found — decompressing records.zip ...${C_RESET}"
+      mkdir -p "$RECORDS"
+      7za e "$SCRIPT_DIR/records.zip" -o"$RECORDS/" -aoa >/dev/null 2>&1
+    fi
+    if ! ls "$RECORDS"/*.txt >/dev/null 2>&1; then
+      echo -e "${C_RED}No records available. Use the 'Add record' option first.${C_RESET}"
+      return 1
+    fi
+  fi
+  return 0
+}
+
+# underline text in a pipe: query the current fzf search term
+underline_query() {
+  local q="$1"
+  [[ -z "$q" ]] && { cat; return; }
+  python3 -c 'import re, sys
+q = sys.argv[1] if len(sys.argv) > 1 else ""
+for line in sys.stdin:
+    s = line.rstrip("\n")
+    try:
+        s = re.sub("(?i)(" + re.escape(q) + ")", "\x1b[4m\\1\x1b[0m", s)
+    except Exception:
+        pass
+    print(s)' "$q"
+}
+
+# colourised whole-record preview, query underlined
+preview_record() {
+  local f="$1" q="$2"
+  [[ -f "$f" ]] || return 1
+  {
+    if command -v bat >/dev/null 2>&1; then
+      bat -p -l python --color=always --style=numbers --line-range=:300 "$f" 2>/dev/null
+    elif python3 -c 'import pygments' >/dev/null 2>&1; then
+      python3 - "$f" <<'PY'
+import sys
+try:
+    from pygments import highlight
+    from pygments.lexers import PythonLexer
+    from pygments.formatters import TerminalFormatter
+    sys.stdout.write(highlight(open(sys.argv[1], encoding="utf-8").read(),
+                               PythonLexer(), TerminalFormatter()))
+except Exception:
+    sys.stdout.write(open(sys.argv[1], encoding="utf-8").read())
+PY
+    else
+      cat "$f"
+    fi
+  } | underline_query "$q"
+}
+
+# neat snippet of the record for the picker panel
+preview_snippet() {
+  local f="$1" q="$2"
+  if [[ -n "$q" ]] && command -v rg >/dev/null 2>&1; then
+    rg --color=always --colors match:fg:red --colors match:style:underline \
+       --colors line:fg:white -n -C 3 "$q" "$f" 2>/dev/null | head -c 4000 || true
+  else
+    bat -p -l python --color=always --style=numbers --line-range=:60 "$f" 2>/dev/null \
+      | head -c 4000
+  fi
+}
+
+#------------------------------------------------------------------------------
+# 1) live search across records  -> select one record (fuzzy, relevant on top)
+#------------------------------------------------------------------------------
+search_records() {
+  require_records || return 1
+
+  local total title file
+  total=$(ls "$RECORDS"/*.txt | wc -l)
+
+  title=$(
+    cd "$SCRIPT_DIR"
+    ls "$RECORDS"/*.txt | xargs -n1 basename | sed 's/\.txt$//' \
+    | sort \
+    | fzf "${FZF_COLOR[@]}" --layout=reverse --height=70% --border=rounded --info=inline \
+        --prompt="Type to live-match records > " \
+        --header="SEARCH RECORDS — $total records · type = live fuzzy match · best hits on top · ESC backs out" \
+        --preview "preview_record '$RECORDS/{}.txt' {q}" \
+        --preview-window=down:45%:wrap:border-rounded --ansi
+  )
+
+  [[ -z "$title" ]] && return 1
+
+  file="$RECORDS/$title.txt"
+  selected="$title"
+  record_flow "$title" "$file"
+}
+
+#------------------------------------------------------------------------------
+# 2) record flow: scrollable viewer + live inside-search + action menu
+#------------------------------------------------------------------------------
+record_flow() {
+  local title="$1" file="$2"
+
+  while true; do
+    action=$(printf '%s\n' \
+        "🔎  Search INSIDE this record (live, colourised, underlined)" \
+        "📜  Scroll through this record" \
+        "📋  Copy this record to clipboard" \
+        "🔍  Search all records for another string" \
+        "➕  Add a new record" \
+        "✏️   Update this record" \
+        "ℹ️   More info on this record" \
+        "📂  Open this record in an editor" \
+        "⬅   Back to main menu" \
+      | fzf "${FZF_COLOR[@]}" --layout=reverse --height=45% --border=rounded --info=inline \
+          --prompt="Record: $title — choose action > " \
+          --header="SELECTED: $title ($(wc -l < "$file") lines · $(wc -c < "$file") bytes)   ·   type to match, ENTER for action" \
+          --ansi)
+    [[ -z "$action" ]] && break
+
+    banner
+    case "$action" in
+      *"INSIDE"*)              search_inside "$title" "$file";;
+      *"Scroll through"*)      scroll_through "$title" "$file";;
+      *"Copy to clipboard"*)   copy_record "$file";;
+      *"another string"*)      search_records; break;;
+      *"Add a new record"*)    add_record;;
+      *"Update this record"*)  update_record_pick "$title" "$file";;
+      *"More info"*)           more_info_record "$title" "$file";;
+      *"editor"*)              editor_record "$file";;
+      *"Back to main"*)        return;;
+    esac
+  done
+}
+
+#------------------------------------------------------------------------------
+# scrollable viewer: every line is a row, only what fits is shown, keep
+# scrolling (or typing to filter, matches pink + underlined) until nothing
+# more to see, then ESC drops you back to the options.
+#------------------------------------------------------------------------------
+scroll_through() {
+  local title="$1" file="$2" total
+  total=$(wc -l < "$file")
+  echo -e "${C_CYAN}${C_BOLD}Record:${C_RESET} ${C_YELLOW}$title${C_RESET} ${C_DIM}(scroll inside · type = live search with matches highlighted)${C_RESET}\n"
+
+  fzf "${FZF_COLOR[@]}" --layout=reverse --height=80% --border=rounded --info=inline \
+      --prompt="View: $title > " \
+      --header="$title — $total lines · scroll with ↑/↓ · type to live-filter (pink+underline) · ENTER = context · ESC = options" \
+      --preview 'preview_snippet "'"$file"'" {q}' \
+      --preview-window=down:14:wrap:border-rounded \
+      --with-nth=1.. --no-sort --ansi \
+      --bind "enter:accept" \
+      < "$file" >/dev/null
+  echo -e "${C_DIM}End of live view — press ENTER for more options${C_RESET}"
+  read -r _
+}
+
+#------------------------------------------------------------------------------
+# live search inside a single record (colourised, matches highlighted/underlined)
+#------------------------------------------------------------------------------
+search_inside() {
+  local title="$1" file="$2"
+
+  echo -e "${C_CYAN}${C_BOLD}Live search inside:${C_RESET} ${C_YELLOW}$title${C_RESET}"
+  echo -e "${C_DIM}Type to filter lines as you go · ↑/↓ + preview scrolls context · ENTER shows more · ESC backs out${C_RESET}\n"
+
+  fzf "${FZF_COLOR[@]}" --layout=reverse --height=75% --border=rounded --info=inline \
+      --prompt="Search inside: $title > " \
+      --header="SEARCH INSIDE RECORD — live filter · matches pink + underlined · preview shows surrounding context" \
+      --preview 'rg --color=always --colors match:fg:red --colors match:style:underline --colors line:fg:white -n -C 3 {q} "'"$file"'" 2>/dev/null | head -c 3000 || true' \
+      --preview-window=down:12:wrap \
+      --with-nth=1.. --no-sort --ansi \
+      < "$file" >/dev/null
+
+  echo -e "\n${C_DIM}Press ${C_WHITE}ENTER${C_DIM} to return to options${C_RESET}"
+  read -r _
+}
+
+#------------------------------------------------------------------------------
+# view the whole record (pager lets you scroll & copy; q to leave)
+#------------------------------------------------------------------------------
+view_whole() {
+  local file="$1"
+  if command -v less >/dev/null 2>&1; then
+    LESS="-R -X -F -M +G" LESSHISTFILE=/dev/null less "$file"
+  else
+    cat "$file"
+    echo -e "\n${C_DIM}(plain view) press ENTER to continue${C_RESET}"
+    read -r _
+  fi
+}
+
+#------------------------------------------------------------------------------
+# copy the whole record to the system clipboard
+#------------------------------------------------------------------------------
+copy_record() {
+  local file="$1"
+  if command -v xclip >/dev/null 2>&1; then
+    xclip -selection clipboard < "$file" && echo -e "${C_GREEN}Copied $file to clipboard.${C_RESET}"
+  elif command -v wl-copy >/dev/null 2>&1; then
+    wl-copy < "$file" && echo -e "${C_GREEN}Copied $file to clipboard.${C_RESET}"
+  elif command -v pbcopy >/dev/null 2>&1; then
+    pbcopy < "$file" && echo -e "${C_GREEN}Copied $file to clipboard.${C_RESET}"
+  else
+    cp "$file" "$SCRIPT_DIR/.clipboard.txt"
+    echo -e "${C_YELLOW}No clipboard tool found — saved copy to: ${C_RESET}${C_WHITE}$SCRIPT_DIR/.clipboard.txt${C_RESET}"
+  fi
+}
+
+#------------------------------------------------------------------------------
+# update record (append new python notes, stays in our flow)
+#------------------------------------------------------------------------------
+update_record_pick() {
+  local title="$1" file="$2"
+  echo -e "${C_GREEN}Updating record:${C_RESET} ${C_YELLOW}$title${C_RESET}"
+  echo -e "${C_DIM}Enter the new/extra content to append (Ctrl-D when done):${C_RESET}\n"
+  cat >> "$file"
+  echo -e "\n${C_GREEN}Record updated.${C_RESET}"
+}
+
+#------------------------------------------------------------------------------
+# open the record in an editor (gedit by default, falls back to nano)
+#------------------------------------------------------------------------------
+editor_record() {
+  local file="$1"
+  if command -v gedit >/dev/null 2>&1; then
+    gedit "$file" >/dev/null 2>&1 &
+  else
+    ${EDITOR:-nano} "$file"
+  fi
+}
+
+#------------------------------------------------------------------------------
+# more info on a record
+#------------------------------------------------------------------------------
+more_info_record() {
+  local title="$1" file="$2"
+  echo -e "${C_CYAN}${C_BOLD}More info:${C_RESET} ${C_YELLOW}$title${C_RESET}"
+  echo -e "${C_DIM}Last modified:${C_RESET} $(stat -c '%y' "$file" 2>/dev/null)"
+  echo -e "${C_DIM}Lines:${C_RESET} $(wc -l < "$file")   ${C_DIM}Bytes:${C_RESET} $(wc -c < "$file")"
+  echo -e "${C_DIM}Full path:${C_RESET} $file"
+  echo ""
+  read -r -p "Press ENTER to continue ... " _
+}
+
+#------------------------------------------------------------------------------
+# add a new record (inline, returns to our flow)
+#------------------------------------------------------------------------------
+add_record() {
+  echo -e "${C_YELLOW}${C_BOLD}Create New Python Record${C_RESET}"
+  read -p "Enter record title (file name): " fname
+  [[ -z "$fname" ]] && { echo -e "${C_RED}Cancelled.${C_RESET}"; return; }
+
+  local target="$RECORDS/$fname.txt"
+  if [[ -f "$target" ]]; then
+    echo -e "${C_RED}Record '$fname' already exists — use Update instead.${C_RESET}"
+    read -r -p "Press ENTER ... " _
+    return
+  fi
+
+  echo -e "${C_DIM}Paste content below (Ctrl-D when finished):${C_RESET}"
+  cat > "$target"
+  if [[ -s "$target" ]]; then
+    echo -e "\n${C_GREEN}Record stored:${C_RESET} ${C_YELLOW}$target${C_RESET}"
+  else
+    rm -f "$target"
+    echo -e "\n${C_RED}Empty — record not saved.${C_RESET}"
+  fi
+}
+
+#------------------------------------------------------------------------------
+# list all records
+#------------------------------------------------------------------------------
+list_records() {
+  require_records || return 1
+  banner
+  echo -e "${C_YELLOW}${C_BOLD}ALL RECORDS${C_RESET}  (total: $(ls "$RECORDS"/*.txt | wc -l))\n"
+  local title
+  title=$(ls "$RECORDS"/*.txt | xargs -n1 basename | sed 's/\.txt$//' | fzf "${FZF_COLOR[@]}" \
+      --layout=reverse --height=70% --border=rounded --info=inline --prompt="Pick to view (or ESC)> " \
+      --preview "preview_record '$RECORDS/{}.txt' {q}" --preview-window=right:60%:wrap:border-rounded --ansi)
+  if [[ -n "$title" ]]; then
+    record_flow "$title" "$RECORDS/$title.txt"
+  fi
+}
+
+#------------------------------------------------------------------------------
+# additional tools (existing scripts, kept on their own menu)
+#------------------------------------------------------------------------------
+tools_menu() {
+  local t
+  t=$(printf '%s\n' \
+      "📦  Compression (zip / unzip records)" \
+      "📖  Add Missing (build a record from pydoc / man)" \
+      "🗂  Open Record by live search" \
+      "↩   Back to main menu" \
+      | fzf "${FZF_COLOR[@]}" --layout=reverse --height=40% --border=rounded --info=inline \
+          --prompt="Tools > " --header="TOOLS" --ansi)
+  case "$t" in
+    *"Compression"*)    bash "$SCRIPT_DIR/compression";;
+    *"Add Missing"*)    bash "$SCRIPT_DIR/add_missing";;
+    *"Open Record"*)    bash "$SCRIPT_DIR/open_record";;
+    *"Back to main"*)   :;;
+  esac
+}
+
+#------------------------------------------------------------------------------
+# main menu
+#------------------------------------------------------------------------------
+main_menu() {
+  local opt
+  opt=$(printf '%s\n' \
+      "🔍  Search Records (live fuzzy match)" \
+      "📄  View all Records" \
+      "➕  Add Record" \
+      "🛠   Tools (compression, add-missing, open-by-search)" \
+      "🚪  Quit" \
+    | fzf "${FZF_COLOR[@]}" --layout=reverse --height=45% --border=rounded --info=inline \
+        --prompt="J~Net Python Cheat Sheet > " \
+        --header="PYTHON DATABASE MENU — use scroll + ENTER (just type to live-match)" \
+        --ansi)
+
+  case "$opt" in
+    *"Search Records"*)   search_records;;
+    *"View all Records"*) list_records;;
+    *"Add Record"*)       banner; add_record; read -r -p "Press ENTER to continue ... " _ ;;
+    *"Tools"*)            tools_menu;;
+    *"Quit"*)             echo -e "${C_DIM}Goodbye.${C_RESET}"; exit 0;;
+    *)                    exit 0;;
+  esac
+}
+
+#------------------------------------------------------------------------------
+# entry point
+#------------------------------------------------------------------------------
+[[ "$1" == "class" ]] && { bash "$SCRIPT_DIR/class-menu"; exit 0; }
+
+# fzf --preview runs in a separate shell; pass our functions along so the
+# "command not found" error never appears.
+export SHELL="/bin/bash"
+export -f preview_record preview_snippet underline_query 2>/dev/null
+
+while true; do
+  require_records
+  banner
+  main_menu
+done

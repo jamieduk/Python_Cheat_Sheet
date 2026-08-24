@@ -1,0 +1,54 @@
+Python Cheat Sheet By (c)J~Net 2022 Updated 2026
+
+Search the Python records for code strings related to your needs and the results can help you write faster code!
+
+Live fuzzy-matching search across records, colourful scrolling viewer with
+in-record live search (matches colourised + underlined) and useful options
+once a record is selected (search inside, re-search, add/update records, copy).
+
+Quick start
+
+  git clone https://github.com/jamieduk/Python_Cheat_Sheet.git
+  cd Python_Cheat_Sheet
+  ./setup          # makes everything executable, extracts records.zip (opt-in)
+  ./menu           # the enhanced interactive J~Net menu (needs fzf)
+  ./class-menu     # simple number-picking class menu
+  ./search_records # standalone live fuzzy search
+
+Dependencies
+
+  fzf     — live matching / scrolling UI (required)
+  bat     — colourful syntax-highlighted previews (recommended, optional)
+  python3 — used by add_missing (pydoc) and preview underlining
+  7za     — records compression (optional, only if you use records.zip)
+
+Tools menu
+
+  Compression   — zip / unzip the records folder with 7za
+  Add Missing   — build a record from a Python module's pydoc (or a man page)
+  Open Record   — live-search then open a single record in a pager
+
+Done. Project converted PHP → Python and given the live-matching interactive UI you asked for.
+./menu — the J~Net interactive menu (all scripts verified with bash -n + pty smoke test):
+- Search across records: type as you go for live fuzzy matching, best hits on top, colourful bat/pygments previews with the query underlined.
+- Pick a record (ENTER) → scrollable live view (scroll_through); scroll to see more, type to filter (matches pink + underlined), ENTER for context, ESC = options.
+- search_inside: live in-record search via fzf with rg context preview, matches bold+red+underlined.
+- Action menu after selection: search inside, scroll through, copy to clipboard, search all records again, add/update record, more info, open in editor.
+Naming — as requested: ./menu = the new J~Net menu, class-menu = the simple pick-by-number class menu (now Python-themed, calls ./menu).
+Scripts updated to Python relevance: add_missing (now builds records from python3 -m pydoc, man fallback), add_record, search_records (standalone fzf live search), show_records, more_info, open_record (fzf picker), update_record, compression (fixed broken bash), setup, plus Notes.txt.
+Records: 22 Python cheat-sheet records added (lists, dictionaries, f-strings/strings, comprehensions, classes, file_io, pathlib, json, regex, error_handling, datetime, venv_pip, collections_itertools, argparse, enums, sorting, slices, tuples, sets, lambdas, functions, modules).
+PROMPT.md and the Backup folder were left untouched. Run ./setup, then ./menu.
+
+Any issues start an issue!
+
+  https://github.com/jamieduk/Python_Cheat_Sheet
+
+Forum Link
+
+  https://jnet.forumotion.com/t1907-python-cheat-sheet#2961
+
+
+The Website Is jnetai.com
+
+More To Come In The Future!
+

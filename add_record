@@ -1,0 +1,47 @@
+#!/bin/bash
+# J~Net Python Cheat Sheet — add a new record (c)J~Net 2022
+#
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RECORDS="$SCRIPT_DIR/records"
+[ ! -d "$RECORDS" ] && mkdir -p "$RECORDS"
+
+NOW=$(date '+%F_%H:%M:%S')
+echo "J~Net Python Cheat Sheet (c)J~Net 2022 — The time & date is $NOW"
+echo -e "\e[93mCreate New Record\e[0m"
+echo ""
+read -r -p "Enter title (record file name): " fname
+[ -z "$fname" ] && { echo "Cancelled."; bash "$SCRIPT_DIR/menu"; exit 0; }
+
+target="$RECORDS/$fname.txt"
+if [[ -f "$target" ]]; then
+    echo -e "\e[31mRecord '$fname' already exists — use update_record instead.\e[0m"
+    read -r -p "Press ENTER ... "
+    bash "$SCRIPT_DIR/menu"
+    exit 0
+fi
+
+count=$(find "$RECORDS" -name '*.txt' | wc -l)
+echo ""
+echo -e "\e[93mPaste the Python content for '$fname' below (Ctrl-D when done):\e[0m"
+{
+    echo "# $fname — added by $USER on $NOW"
+    echo ""
+    cat
+} > "$target"
+
+if [[ -s "$target" ]]; then
+    echo ""
+    echo -e "\e[92mRecord stored @ $target  (record number $((count + 1)))\e[0m"
+    echo ""
+    read -r -p "Open in editor to review? y/N " ans
+    case "$ans" in
+        [Yy]* ) command -v gedit >/dev/null 2>&1 && gedit "$target" 2>/dev/null & :;;
+        *)      echo "Saved.";;
+    esac
+else
+    rm -f "$target"
+    echo -e "\e[31mEmpty — record not saved.\e[0m"
+fi
+
+read -r -p "Press ENTER ... "
+bash "$SCRIPT_DIR/menu"

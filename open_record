@@ -1,0 +1,30 @@
+#!/bin/bash
+# J~Net Python Cheat Sheet — open a record (c)J~Net 2022
+#
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RECORDS="$SCRIPT_DIR/records"
+NOW=$(date '+%F_%H:%M:%S')
+
+echo "J~Net Python Cheat Sheet (c)J~Net 2022 — The time & date is $NOW"
+echo ""
+echo -e "\e[93mType to live-search for the record number / title to open\e[0m"
+
+title=$(cd "$SCRIPT_DIR" && \
+    ls "$RECORDS"/*.txt 2>/dev/null | xargs -n1 basename | sed 's/\.txt$//' | sort | \
+    fzf --layout=reverse --height=60% --border=rounded --info=inline \
+        --prompt="Record to open > " \
+        --preview "bat -p -l python --color=always --style=numbers $RECORDS/{}.txt 2>/dev/null || cat $RECORDS/{}.txt" \
+        --preview-window=down:50%:wrap:border-rounded)
+
+if [[ -n "$title" ]]; then
+    file="$RECORDS/$title.txt"
+    echo -e "\e[92mOpening:\e[0m $file  ($(wc -l < "$file") lines)"
+    LESS="-R -X -F -M +G" LESSHISTFILE=/dev/null less "$file"
+else
+    echo "No record selected."
+fi
+
+echo ""
+echo "Press Enter To Continue"
+read -r _
+bash "$SCRIPT_DIR/menu"

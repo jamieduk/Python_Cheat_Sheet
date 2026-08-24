@@ -1,0 +1,63 @@
+#!/bin/bash
+# J~Net Python Cheat Sheet — live fuzzy search across records (c)J~Net 2022
+# Colourful results with relevant matches on top; pick one, view it, scroll.
+#
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RECORDS="$SCRIPT_DIR/records"
+
+[ ! -d "$RECORDS" ] && mkdir -p "$RECORDS"
+if ! ls "$RECORDS"/*.txt >/dev/null 2>&1; then
+    echo "No records yet — run ./add_record first." >&2
+    read -r -p "Press ENTER ... "
+    bash "$SCRIPT_DIR/menu"
+    exit 0
+fi
+
+export SHELL="/bin/bash"
+
+preview_py() {
+    local f="$1" q="$2"
+    [[ -f "$f" ]] || return 1
+    {
+        if command -v bat >/dev/null 2>&1; then
+            bat -p -l python --color=always --style=numbers --line-range=:150 "$f" 2>/dev/null
+        else
+            cat "$f"
+        fi
+    } | python3 -c 'import re, sys
+q = sys.argv[1] if len(sys.argv) > 1 else ""
+for line in sys.stdin:
+    s = line.rstrip("\n")
+    try: s = re.sub("(?i)(" + re.escape(q) + ")", "\x1b[4m\\1\x1b[0m", s)
+    except Exception: pass
+    print(s)' "$q"
+}
+export -f preview_py 2>/dev/null
+
+FZF_COLOR=(
+  --color=fg:#bbbbbb,bg:-1,hl:#ff87af:underline,fg+:#ffffff,bg+:#2b2b2b,hl+:#ff87af:underline
+  --color=info:#87af5f,prompt:#5f87ff,pointer:#ff5f87,marker:#87afff
+  --color=spinner:#ff5f87,header:#87af5f,query:#ffd75f,border:#585858
+)
+
+total=$(ls "$RECORDS"/*.txt | wc -l)
+
+title=$(
+    cd "$SCRIPT_DIR"
+    ls "$RECORDS"/*.txt | xargs -n1 basename | sed 's/\.txt$//' | sort | \
+    fzf "${FZF_COLOR[@]}" --layout=reverse --height=70% --border=rounded --info=inline \
+        --prompt="Type to live-match records > " \
+        --header="SEARCH PYTHON RECORDS — $total records · type = fuzzy match, best hits on top · ESC backs out" \
+        --preview "preview_py '$RECORDS/{}.txt' {q}" \
+        --preview-window=down:45%:wrap:border-rounded --ansi
+)
+
+if [[ -n "$title" ]]; then
+    echo ""
+    clear
+    LESS="-R -X -F -M +G" LESSHISTFILE=/dev/null less "$RECORDS/$title.txt"
+    echo -e "\e[92mRecord: $title\e[0m — copy with the pager or press q to return"
+fi
+
+read -r -p "Press ENTER to go back to the menu ... "
+bash "$SCRIPT_DIR/menu"

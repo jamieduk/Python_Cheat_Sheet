@@ -1,0 +1,28 @@
+#!/bin/bash
+# (c) J~Net 2022
+# Class menu — pick a project script by number and run it.
+# The enhanced interactive menu is ./menu (the J~Net menu).
+#
+echo -e "\e[93mJ~Net Python Cheat Sheet — Class Menu (c)J~Net 2022\e[0m"
+echo ""
+echo "Pick a script to run (a number), or Ctrl-C to quit:"
+echo ""
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+scripts=(add_record search_records show_records more_info update_record open_record add_missing compression)
+
+select fname in "${scripts[@]}"
+do
+    [[ -z "$fname" ]] && { echo "Nothing picked — quitting."; exit; }
+    echo ""
+    echo "Running: $fname"
+    echo ""
+    bash "$SCRIPT_DIR/$fname"
+    echo ""
+    bash "$SCRIPT_DIR/menu"
+    break
+done
+
+bash "$SCRIPT_DIR/menu"

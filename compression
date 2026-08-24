@@ -1,0 +1,35 @@
+#!/bin/bash
+# J~Net Python Cheat Sheet — compress / decompress the records folder (c)J~Net 2022
+#
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+folder="$SCRIPT_DIR/records"
+program="7za"
+[ ! -d "$folder" ] && mkdir -p "$folder"
+cd "$SCRIPT_DIR"
+
+echo "Do You Wish To Decompress (1) Or Compress (2) The Records?"
+read -r intent
+
+if [ "$intent" -eq 1 ]
+then
+    echo "You Selected Decompress"
+    if [[ -f records.zip ]]; then
+        echo "records/ already exists — extracting over it."
+    fi
+    $program e records.zip -o"$folder"/ -aoa && rm -f records.zip
+    echo "Decompressed."
+else
+    echo "You Selected Compress"
+    if ls "$folder"/*.txt >/dev/null 2>&1; then
+        $program a records.zip "$folder"/*.txt
+        echo "Attempting to set permissions for the new file for you, $USER"
+        sudo chown "$USER" records.zip 2>/dev/null || chown "$USER" records.zip
+    else
+        echo "No records found to compress — add some first."
+    fi
+fi
+
+echo "Type q To Quit"
+read -r done
+echo "Back to menu..."
+bash "$SCRIPT_DIR/menu"

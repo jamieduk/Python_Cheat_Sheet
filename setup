@@ -1,0 +1,24 @@
+#!/bin/bash
+# J~Net Python Cheat Sheet — setup  (c)J~Net 2022
+#
+NOW=$(date '+%F_%H:%M:%S')
+echo "This Will Setup J~Net Python Cheat Sheet 2022 — The time & date is $NOW"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+for f in menu class-menu add_record search_records show_records more_info \
+         update_record open_record add_missing compression setup
+do
+    [ -f "$f" ] && chmod +x "$f"
+done
+
+# Decompress records archive on first run, if present
+if [ -f records.zip ] && ! ls records/*.txt >/dev/null 2>&1; then
+    mkdir -p records
+    7za e records.zip -orecords/ -aoa >/dev/null 2>&1 && rm -f records.zip
+fi
+
+[ ! -d records ] && mkdir -p records
+
+echo "Setup complete — starting the menu..."
+bash "$SCRIPT_DIR/menu"

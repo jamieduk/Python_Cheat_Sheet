@@ -1,0 +1,42 @@
+#!/bin/bash
+# (c) J~Net 2022
+# Build a cheat-sheet record from a Python module's pydoc output (or a man page).
+# .add_missing os          -> creates records/os.txt
+#
+path="records/"
+[ ! -d "$path" ] && mkdir -p "$path"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+defaultinput="os"
+input="$1"
+echo "Welcome To Python Record Creator By (c)J~Net 2022"
+if [ -z "$input" ]
+then
+    read -r -p "Enter Python module / keyword to create a record for [$defaultinput]: " input
+    input="${input:-$defaultinput}"
+fi
+
+file="$path/$input.txt"
+if [[ -f $file ]]
+then
+    echo ""
+    echo "Record already exists @ records/$input.txt"
+    echo "Use update_record to add more to it."
+else
+    echo "Creating Record, Please Wait..."
+    if python3 -m pydoc "$input" >/dev/null 2>&1; then
+        python3 -m pydoc "$input" > "$file" 2>/dev/null
+    elif command -v man >/dev/null 2>&1 && man "$input" >/dev/null 2>&1; then
+        man "$input" | col -b > "$file"
+    else
+        echo "No pydoc/man page found for '$input' — creating a blank record."
+        echo "# $input" > "$file"
+        echo "" >> "$file"
+        echo "// TODO: add Python notes for $input" >> "$file"
+    fi
+    echo "Add Complete!"
+    echo ""
+    cat "$file"
+fi
+read -r -p "Press ENTER ... "
+bash "$SCRIPT_DIR/menu"

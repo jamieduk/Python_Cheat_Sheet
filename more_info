@@ -1,0 +1,40 @@
+#!/bin/bash
+# J~Net Python Cheat Sheet — more info on a record (c)J~Net 2022
+#
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RECORDS="$SCRIPT_DIR/records"
+NOW=$(date '+%F_%H:%M:%S')
+
+echo "J~Net Python Cheat Sheet (c)J~Net 2022 — The time & date is $NOW"
+echo ""
+input=""
+if command -v fzf >/dev/null 2>&1 && ls "$RECORDS"/*.txt >/dev/null 2>&1; then
+    echo "Pick the record to inspect:"
+    input=$(cd "$SCRIPT_DIR" && \
+        ls "$RECORDS"/*.txt | xargs -n1 basename | sed 's/\.txt$//' | sort | \
+        fzf --layout=reverse --height=40% --border=rounded --prompt="Record > " )
+    [ -n "$input" ] && input="$RECORDS/$input.txt"
+fi
+
+if [[ -z "$input" ]]; then
+    echo "Use search_records option to find records."
+    read -r -p "Or enter the path of a record to inspect: " input
+    [ -z "$input" ] && { bash "$SCRIPT_DIR/menu"; exit 0; }
+fi
+
+if [[ -f "$input" ]]; then
+    echo ""
+    echo "Record requested, please wait..."
+    echo ""
+    wc -l "$input"
+    wc -c "$input"
+    echo -e "\e[93mLast modified date of record:\e[0m"
+    stat -c %y "$input"
+    echo ""
+    tail -n 20 "$input"
+else
+    echo -e "\e[31mRecord not found: $input\e[0m"
+fi
+
+read -r -p "Press ENTER to continue ... "
+bash "$SCRIPT_DIR/menu"
