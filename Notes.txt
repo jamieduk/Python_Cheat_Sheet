@@ -1,6 +1,8 @@
-Python Cheat Sheet By (c)J~Net 2022 Updated 2026
+Python Cheat Sheet By (c)J~Net 2026
 
 Search the Python records for code strings related to your needs and the results can help you write faster code!
+
+https://github.com/jamieduk/Python_Cheat_Sheet
 
 Live fuzzy-matching search across records, colourful scrolling viewer with
 in-record live search (matches colourised + underlined) and useful options
