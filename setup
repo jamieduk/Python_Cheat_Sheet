@@ -20,5 +20,9 @@ fi
 
 [ ! -d records ] && mkdir -p records
 
+sudo apt install -y fzf p7zip-full bat
+
+chmod +x add_missing add_record compression jnet menu more_info open_record search_records show_records update-check update_record
+
 echo "Setup complete — starting the menu..."
 bash "$SCRIPT_DIR/menu"
