@@ -1,48 +1,41 @@
 #!/bin/bash
-# J~Net Python Cheat Sheet — update / append to a record (c)J~Net 2022
-#
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RECORDS="$SCRIPT_DIR/records"
-NOW=$(date '+%F_%H:%M:%S')
-
-echo "J~Net Python Cheat Sheet (c)J~Net 2022 — The time & date is $NOW"
+NOW=`date '+%F_%H:%M:%S'`;
+echo "J~Net Bash Database (c)J~Net 2021 The Time & Date Is $NOW"
 echo ""
-echo -e "\e[93mUpdate Record\e[0m"
+echo "Update Record"
 echo ""
-read -r -p "Enter record filename (without .txt): " input
-[ -z "$input" ] && { echo "Nothing entered — cancelled."; bash "$SCRIPT_DIR/menu"; exit 0; }
-
-file="$RECORDS/$input.txt"
-if [[ ! -f "$file" ]]; then
-    echo -e "\e[31mRecord '$input' not found — use search_records to find one.\e[0m"
-    read -r -p "Press ENTER ... "
-    bash "$SCRIPT_DIR/menu"
-    exit 0
-fi
-
-echo "Current record tail:"
-echo "-----------------------------------------------"
-tail -n 8 "$file"
-echo "-----------------------------------------------"
-echo ""
-echo -e "\e[93mPaste the additional Python notes to append (Ctrl-D when done):\e[0m"
-{
-    echo ""
-    echo "# Updated by $USER @ $NOW"
-    cat
-} > "$SCRIPT_DIR/.update_tmp.txt"
-
-while true; do
-    read -r -p "Happy with this update? Y or N: " yn
-    case "$yn" in
-        [Yy]* ) cat "$SCRIPT_DIR/.update_tmp.txt" >> "$file"; echo -e "\e[92mRecord updated.\e[0m"; break;;
-        [Nn]* ) echo "Discarding update."; break;;
-        * )     echo "Please try again (Y or N).";;
+echo "Enter Your Name / Number"
+read agent
+echo "Enter Record Filename"
+read input
+# Check User input
+if [ -z "$input" ]
+then
+    echo "Use search_records Option To Find Records."
+    #break
+else
+    echo "Enter Update Details"
+    read update
+    #cat $input > temp.txt
+    echo "Agent $agent Logged In AS $USER Updated Record $input @ $NOW" > temp.txt
+    echo $update >> temp.txt
+    cat temp.txt
+    while true; do
+echo "Happy With This Update Correct? Y or N"
+read yn
+    case $yn in
+        [Yy]* ) cat temp.txt >> $input
+break;;
+        [Nn]* ) exit;;
+        * ) echo "Please Try Again.";;
     esac
 done
-rm -f "$SCRIPT_DIR/.update_tmp.txt"
 
-echo ""
-echo "Press ENTER to continue"
-read -r _
-bash "$SCRIPT_DIR/menu"
+fi
+echo "Record Updated!"
+cat $input
+echo "Press Enter To Continue"
+read Y
+rm temp.txt
+clear
+bash menu

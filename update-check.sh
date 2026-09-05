@@ -2,12 +2,7 @@
 
 set -uo pipefail
 repo_to_check="https://github.com/jamieduk/Python_Cheat_Sheet"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CURRENT_VERSION="${CURRENT_VERSION:-1.0.0}"
-if [[ -f "$SCRIPT_DIR/package.json" ]]; then
-  LOCAL_VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$SCRIPT_DIR/package.json")"
-  [[ -n "$LOCAL_VERSION" ]] && CURRENT_VERSION="$LOCAL_VERSION"
-fi
 
 GH_TOKEN="${GITHUB_TOKEN:-}"
 
